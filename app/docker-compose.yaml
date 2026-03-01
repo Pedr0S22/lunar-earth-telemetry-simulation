@@ -1,0 +1,134 @@
+version: '3'   
+networks:
+  deep-space-net:
+    name: deep-space-net
+    driver: bridge
+
+
+  ground-control-net:
+    name: ground-control-net
+    driver: bridge
+
+
+volumes:
+  kafka-data:
+  influxdb-data:
+    driver: local
+    name: "influxdb-data"
+  influxdb-conf:
+    driver: local
+    name: "influxdb-conf"
+
+services:
+  kafka-kraft:
+    image: bitnamilegacy/kafka:latest
+    container_name: kafka-kraft
+    environment:
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka-kraft:9093"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,CLIENT:PLAINTEXT"
+      KAFKA_CFG_LISTENERS: "CLIENT://:9092,CONTROLLER://:9093"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "CLIENT://kafka-kraft:9092"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "CLIENT"
+    volumes:
+      - kafka-data:/bitnami/kafka
+    networks:
+      - deep-space-net
+    healthcheck:
+      test: kafka-topics.sh --bootstrap-server kafka-kraft:9092 --topic hc --create --if-not-exists && kafka-topics.sh --bootstrap-server kafka-kraft:9092 --topic hc --describe
+      start_period: 10s
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  prod-mobility:
+    build: ./producers
+    command: python producer_mobility.py
+    container_name: prod-mobility
+    networks:
+      - deep-space-net
+    environment:
+      KAFKA_BROKER: "kafka-kraft:9092"
+      KAFKA_TOPIC: "telemetry-mobility"
+      PRODUCER_SCRIPT: "producer_mobility.py"
+    depends_on:
+      kafka-kraft:
+        condition: service_healthy
+
+  prod-eclss:
+    build: ./producers
+    command: python producer_eclss.py
+    container_name: prod-eclss
+    networks:
+      - deep-space-net
+    environment:
+      KAFKA_BROKER: "kafka-kraft:9092"
+      KAFKA_TOPIC: "telemetry-eclss"
+      PRODUCER_SCRIPT: "producer_eclss.py"
+    depends_on:
+      kafka-kraft:
+        condition: service_healthy
+
+  prod-hga:
+    build: ./producers
+    command: python producer_hga.py
+    container_name: prod-hga
+    networks:
+      - deep-space-net
+    environment:
+      KAFKA_BROKER: "kafka-kraft:9092"
+      KAFKA_TOPIC: "telemetry-comms"
+      PRODUCER_SCRIPT: "producer_hga.py"
+    depends_on:
+      kafka-kraft:
+        condition: service_healthy
+
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    networks:
+      - ground-control-net
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-conf:/etc/influxdb2
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: "setup"
+      DOCKER_INFLUXDB_INIT_USERNAME: "${DOCKER_INFLUXDB_INIT_USERNAME}"
+      DOCKER_INFLUXDB_INIT_PASSWORD: "${DOCKER_INFLUXDB_INIT_PASSWORD}"
+      DOCKER_INFLUXDB_INIT_ORG: "${DOCKER_INFLUXDB_INIT_ORG}"
+      DOCKER_INFLUXDB_INIT_BUCKET: "${DOCKER_INFLUXDB_INIT_BUCKET}"
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: "${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}"
+      DOCKER_INFLUXDB_INIT_FORCE: "true"  
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  telegraf:
+    image: telegraf:latest
+    container_name: telegraf
+    restart: unless-stopped
+    environment:
+      INFLUX_ORG: "${DOCKER_INFLUXDB_INIT_ORG}"
+      INFLUX_BUCKET: "${DOCKER_INFLUXDB_INIT_BUCKET}"
+      INFLUX_TOKEN: "${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}"
+      INFLUX_URL: "http://influxdb:8086"
+    networks:
+      - ground-control-net
+      - deep-space-net
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      kafka-kraft:
+        condition: service_healthy
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
