@@ -1,6 +1,6 @@
 # Resilient Telemetry for Lunar Exploration Infrastructure
 
-## Project Description (Overview)
+## Project Description
 This project simulates the telemetry pipeline of a Lunar Surface Rover communicating with a Gateway Orbiter. In extraterrestrial networks, data transmission faces high Bit Error Rates (BER), intermittent connectivity, and harsh environmental variables. 
 
 To address these challenges, this project engineers a Dockerized "Systems-of-Systems" architecture. It deploys a resilient ingestion pipeline that decouples data generation (sensors) from data persistence (database) using a message broker. This ensures that critical operational data—ranging from life-support metrics to orbital link diagnostics—is buffered, processed, and visualized in near real-time, simulating a true Cloud-to-Deep-Space continuum.
@@ -16,7 +16,7 @@ To address these challenges, this project engineers a Dockerized "Systems-of-Sys
 
 ## Project Structure (Pipeline & Architecture)
 
-The system enforces strict network isolation to simulate the air gap between operational technology (the rover) and IT infrastructure (the mission control database). It utilizes two distinct Docker networks: `deep-space-net` and `ground-control-net`, bridged securely by the ingestion agent.
+The system enforces strict network isolation to simulate the air gap between operational technology (the rover) and IT infrastructure (the mission control database). It utilizes two distinct Docker networks: `deep-space-net` and `ground-control-net`, bridged securely by the ingestion agent. Below you find the details of the pipeline architecture.
 
 ![architecture](lunar_architecture.png)
 
