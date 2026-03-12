@@ -18,7 +18,7 @@ To address these challenges, this project engineers a Dockerized "Systems-of-Sys
 
 The system enforces strict network isolation to simulate the air gap between operational technology (the rover) and IT infrastructure (the mission control database). It utilizes two distinct Docker networks: `deep-space-net` and `ground-control-net`, bridged securely by the ingestion agent.
 
-![architecture](system-architecture.png)
+![architecture](lunar-architecture.png)
 
 ## System Components & Services
 
