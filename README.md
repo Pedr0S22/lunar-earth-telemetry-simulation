@@ -5,25 +5,20 @@ This project simulates the telemetry pipeline of a Lunar Surface Rover communica
 
 To address these challenges, this project engineers a Dockerized "Systems-of-Systems" architecture. It deploys a resilient ingestion pipeline that decouples data generation (sensors) from data persistence (database) using a message broker. This ensures that critical operational data—ranging from life-support metrics to orbital link diagnostics—is buffered, processed, and visualized in near real-time, simulating a true Cloud-to-Deep-Space continuum.
 
----
-
 ## Table of Contents
 1. [Project Description](#project-description-overview)
 2. [Project Structure (Pipeline & Architecture)](#project-structure-pipeline--architecture)
 3. [System Components & Services](#system-components--services)
-4. [Deployment & Setup](#deployment--setup)
-5. [License](#license)
-6. [Authors](#authors)
-
----
+4. [Docker Compose Architecture](#docker-compose-architecture)
+5. [Deployment & Setup](#deployment--setup)
+6. [License](#license)
+7. [Authors](#authors)
 
 ## Project Structure (Pipeline & Architecture)
 
 The system enforces strict network isolation to simulate the air gap between operational technology (the rover) and IT infrastructure (the mission control database). It utilizes two distinct Docker networks: `deep-space-net` and `ground-control-net`, bridged securely by the ingestion agent.
 
-[architecture](system-architecture.png)
-
----
+![architecture](system-architecture.png)
 
 ## System Components & Services
 
@@ -44,7 +39,18 @@ Serves as the mission control archive (Organization: `esa-sic`, Bucket: `lunar-m
 * **Mission Dashboard:** Includes real-time gauge indicators for cabin pressure, heatmaps correlating motor RPM with wheel traction, and threshold graphs tracking critical battery discharge.
 * **Automated Flux Alerts:** Runs custom Flux scripts (`alert_eclss.flux`, `alert_hga.flux`, `alert_mobility.flux`) to automatically evaluate telemetry streams and trigger `OK`, `INFO`, `WARN`, and `CRIT` states based on mission parameters.
 
----
+
+## Docker Compose Architecture
+To ensure fault tolerance, isolation, and reliable data flow, the `docker-compose.yml` file leverages three critical Docker concepts:
+
+### 1. Persistent Volumes
+In extraterrestrial deployments, data loss is catastrophic. Docker containers are ephemeral by nature, meaning if a container crashes, its internal data is destroyed. To solve this, Persistent Volumes map a storage area on the host machine to the container's internal directory. We explicitly define named volumes for both Kafka (kafka-data) and InfluxDB (influxdb-data). This guarantees that if the broker or database containers restart, all buffered messages and historical telemetry are preserved and immediately reattached.
+
+### 2. Ports Exposure vs. Isolation
+Containers run in isolated networks. We use port mapping to punch selective holes through this isolation, using the format `HOST_PORT:CONTAINER_PORT`. We map InfluxDB's `port 8086` to the host machine ("8086:8086") so that Ground Control (web browser in the simulation) can access the UI and dashboards. However, the internal Kafka broker and Python producers are deliberately not exposed to the host, ensuring they remain isolated within the deep-space-net to simulate a secure, air-gapped operational environment.
+
+### 3. Health Checks
+Containers booting up do not mean the applications inside are instantly ready to receive data. We implement Health Checks on core services like Kafka and InfluxDB. The Python telemetry producers use the depends_on: condition: service_healthy directive. This ensures the producers will patiently wait until Kafka is fully initialized before attempting to send data, preventing "No Brokers Available" crash loops upon startup.
 
 ## Deployment & Setup
 
@@ -52,22 +58,17 @@ The entire architecture is containerized and orchestrated via Docker Compose, en
 
 1. **Clone the repository.**
 2. **Environment Setup:** Configure the `.env` file with the necessary credentials and InfluxDB tokens to avoid hardcoding secrets.
-3. **Launch the Pipeline:** ```bash
+3. **Launch the Pipeline:**
+   ```bash
    docker compose up --build -d
    ```
 4. **Access the Mission Control Dashboard:** Open `http://localhost:8086` and authenticate using the credentials specified in your `.env` file. Import `dashboard.json` to view the customized Mission Control telemetry displays.
-
-*(Note: Ensure Docker networks are built successfully and wait for Kafka health checks to pass before the Python producers initiate data generation.)*
-
----
 
 ## License
 
 This project is licensed under the MIT License - see the `LICENSE` file for details.
 
----
-
 ## Authors
 
-* **Pedro Silva** - 
-* **Ramyad Raasi** - 
+* **Pedro Silva** - pedrosilva222004@gmail.com
+* **Ramyad Raadi** - uc2023205631@student.uc.pt
